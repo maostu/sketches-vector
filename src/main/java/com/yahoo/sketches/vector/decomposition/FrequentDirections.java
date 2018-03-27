@@ -249,8 +249,10 @@ public final class FrequentDirections {
    * @return An array of singular values.
    */
   public double[] getSingularValues(final boolean compensative) {
-    final SingularValue<Double> svd = SingularValue.make(B_);
-    svd.compute(B_);
+    //final SingularValue<Double> svd = SingularValue.make(B_);
+    //svd.compute(B_);
+    final TruncatedSVD svd = TruncatedSVD.make(B_);
+    svd.compute(B_, k_);
     svd.getSingularValues(sv_);
 
     double medianSVSq = sv_[k_ - 1]; // (l_/2)th item, not yet squared
@@ -274,9 +276,12 @@ public final class FrequentDirections {
    * @return An orthonormal Matrix object
    */
   public Matrix getProjectionMatrix() {
-    final SingularValue<Double> svd = SingularValue.make(B_);
-    svd.compute(B_);
-    final MatrixStore<Double> m = svd.getQ2().transpose();
+    //final SingularValue<Double> svd = SingularValue.make(B_);
+    //svd.compute(B_);
+    final TruncatedSVD svd = TruncatedSVD.make(B_);
+    svd.compute(B_, k_);
+    //final MatrixStore<Double> m = svd.getQ2().transpose();
+    final MatrixStore<Double> m = svd.getVt();
 
     // not super efficient...
     final Matrix result = Matrix.builder().build(k_, d_);
@@ -321,8 +326,10 @@ public final class FrequentDirections {
     final PrimitiveDenseStore result = PrimitiveDenseStore.FACTORY.makeZero(nextZeroRow_, d_);
 
     if (compensative) {
-      final SingularValue<Double> svd = SingularValue.make(B_);
-      svd.compute(B_);
+      //final SingularValue<Double> svd = SingularValue.make(B_);
+      //svd.compute(B_);
+      final TruncatedSVD svd = TruncatedSVD.make(B_);
+      svd.compute(B_, l_);
       svd.getSingularValues(sv_);
 
       for (int i = 0; i < k_ - 1; ++i) {
@@ -334,7 +341,8 @@ public final class FrequentDirections {
         S_.set(i, i, 0.0);
       }
 
-      S_.multiply(svd.getQ2().transpose(), result);
+      //S_.multiply(svd.getQ2().transpose(), result);
+      S_.multiply(svd.getVt(), result);
     } else {
       // there's gotta be a better way to copy rows than this
       for (int i = 0; i < nextZeroRow_; ++i) {
@@ -502,9 +510,31 @@ public final class FrequentDirections {
   double getSvAdjustment() { return svAdjustment_; }
 
   private void reduceRank() {
-    final SingularValue<Double> svd = SingularValue.make(B_);
-    svd.compute(B_);
+    /*
+    final double[] fullSv = new double[l_];
+    final double[] truncSv = new double[l_];
+
+    final SingularValue<Double> fullSvd = SingularValue.make(B_);
+    fullSvd.compute(B_);
+    fullSvd.getSingularValues(fullSv);
+    System.out.print("[");
+    for (int i = 0; i < fullSv.length; ++i) {
+      System.out.printf("%.1f%s", sv_[i], (i < fullSv.length - 1 ? ", " : ""));
+    }
+    System.out.println("]");
+    */
+
+    final TruncatedSVD svd = TruncatedSVD.make(B_);
+    svd.compute(B_, l_);
     svd.getSingularValues(sv_);
+    /*
+    svd.getSingularValues(truncSv);
+    System.out.print("[");
+    for (int i = 0; i < truncSv.length; ++i) {
+      System.out.printf("%.1f%s", sv_[i], (i < truncSv.length - 1 ? ", " : ""));
+    }
+    System.out.println("]");
+    */
 
     if (sv_.length >= k_) {
       double medianSVSq = sv_[k_ - 1]; // (l_/2)th item, not yet squared
@@ -530,6 +560,6 @@ public final class FrequentDirections {
       throw new RuntimeException("Running with d < 2k not yet supported");
     }
 
-    S_.multiply(svd.getQ2().transpose()).supplyTo(B_);
+    S_.multiply(svd.getVt()).supplyTo(B_);
   }
 }
